@@ -1,107 +1,65 @@
-📋 Table of Contents
+# 🧮 Limit Order Book Engine
 
-🤖 Introduction
+A performance-focused trading engine built in Rust with a real-time React dashboard. It mirrors the core mechanics of modern exchanges using FIFO limit order matching and WebSocket-based data broadcasting.
 
-⚙️ Tech Stack
+---
 
-🔋 Features
+## 📋 Table of Contents
 
-🤸 Quick Start
+- 🤖 [Introduction](#-introduction)  
+- ⚙️ [Tech Stack](#-tech-stack)  
+- 🔋 [Features](#-features)  
+- 🤸 [Quick Start](#-quick-start)  
+- 🕸️ [Snippets](#-snippets)  
+- 🔗 [Links](#-links)  
+- 🚀 [More](#-more)  
+- 🚨 [Tutorial](#-tutorial)
 
-🕸️ Snippets
+---
 
-🔗 Links
+## 🤖 Introduction
 
-🚀 More
+This project simulates a working limit order book — the foundation of modern trading platforms. It handles buy/sell order placement, cancellation, matching, and live trade display. The frontend syncs with the engine in real time using WebSockets and reflects all activity in a fully interactive UI.
 
+Whether you're exploring Rust performance, real-time state management, or order book design, this is a hands-on sandbox for building trading logic from the ground up.
 
-🚨 Tutorial
+---
 
-🤖 Introduction
-The Limit Order Book Engine is a performance-focused trading simulation system built in Rust with a React frontend. It mirrors the architecture of real-world exchanges, allowing users to place buy/sell orders, observe a live order book, and view trade history in real time.
+## ⚙️ Tech Stack
 
-This project is perfect for exploring real-time systems, concurrency in Rust, and WebSocket-based client syncing — all through a fully interactive trading UI.
+- 🦀 **Rust** – backend engine with Axum + Tokio
+- 🧠 **React** – frontend dashboard (with TypeScript)
+- 📡 **WebSockets** – real-time bidirectional updates
+- ⚛️ **Recoil** – client state management
+- 💨 **Tailwind CSS** – UI styling
+- 📈 **Criterion** – benchmarking
+- 🔥 **Flamegraph** – performance profiling
+- 🧱 **(Planned)** Redis – persistence layer
 
+---
 
-⚙️ Tech Stack
-- Rust (Axum, Tokio, Serde)
+## 🔋 Features
 
-- React + TypeScript + Tailwind CSS
+👉 FIFO-based limit order matching engine  
+👉 Real-time trade feed via WebSockets  
+👉 Order book synced across all clients  
+👉 User-specific "My Orders" view with cancel actions  
+👉 Stateless engine with clear separation of concerns  
+👉 Performance profiling with Flamegraph (optional)  
+👉 Modular frontend UI with Recoil-based sync
 
-- WebSockets (custom broadcast system)
+---
 
-- Recoil for state management
+## 🤸 Quick Start
 
-- Criterion & Flamegraph (performance profiling)
+### 📦 Prerequisites
 
-- Planned: Redis for data persistence
+- Rust (v1.70+ recommended)
+- Node.js + npm
+- (Optional) Flamegraph: `cargo install flamegraph`
 
+### 🧱 Installation
 
-🔋 Features
-👉 FIFO-based buy/sell order matching
-
-👉 Live trade feed over WebSockets
-
-👉 Real-time order book with client sync
-
-👉 "My Orders" dashboard with cancel functionality
-
-👉 Stateless backend with async broadcast
-
-👉 Type-safe data models and event-driven logic
-
-👉 Simple setup — no auth, no DB, just code
-
-
-🤸 Quick Start
-
-Follow these instructions to help set up on your loacl machine
-
-📦 Prerequisites
-
-- Rust
-
-- Node.js
-
-- cargo install flamegraph (optional)
-
-
-🧱 Clone & Install
-
+```bash
 git clone https://github.com/tdkayy/limit-order-book
 cd limit-order-book
-
-
-Run backend:
-cd backend
-cargo run
-
-
-Run frontend:
-cd frontend
-npm install
-npm run dev
-
-
-🕸️ Snippets
-- src/hooks/useOrderBookSocket.ts — live WebSocket state sync
-
-- api_server.rs — order routing & matching logic
-
-- components/OrderBook.tsx — frontend LOB renderer
-
-- flamegraph.svg — optional CPU profiling report
-
-- types/index.ts — shared data model interfaces
-
-
-🔗 Links
-- 🔗 GitHub Repo
-
-- 🌐 Live Demo – Coming Soon
-
-
-🚨 Tutorial
-Want a step-by-step breakdown of how this was built?
-📺 A full written or video walkthrough may be published soon.
-Follow @tdkayy for updates!
