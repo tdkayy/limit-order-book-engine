@@ -10,10 +10,10 @@ A performance-focused trading engine built in Rust with a real-time React dashbo
 - ⚙️ [Tech Stack](#-tech-stack)  
 - 🔋 [Features](#-features)  
 - 🤸 [Quick Start](#-quick-start)  
-- 🕸️ [Snippets](#-snippets)  
-- 🔗 [Links](#-links)  
-- 🚀 [More](#-more)  
-- 🚨 [Tutorial](#-tutorial)
+- 🕸️ [Snippets](#-snippets)   (coming soon)
+- 🔗 [Links](#-links)  (coming soon)
+- 🚀 [More](#-more)   (coming soon)
+- 🚨 [Tutorial](#-tutorial)  (coming soon)
 
 ---
 
