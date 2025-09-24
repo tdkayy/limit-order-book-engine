@@ -19,7 +19,7 @@ A performance-focused trading engine built in Rust with a real-time React dashbo
 
 ## 🤖 Introduction
 
-This project simulates a working limit order book — the foundation of modern trading platforms. It handles buy/sell order placement, cancellation, matching, and live trade display. The frontend syncs with the engine in real time using WebSockets and reflects all activity in a fully interactive UI.
+This project simulates a working limit order book, the foundation of modern trading platforms. It handles buy/sell order placement, cancellation, matching, and live trade display. The frontend syncs with the engine in real time using WebSockets and reflects all activity in a fully interactive UI.
 
 Whether you're exploring Rust performance, real-time state management, or order book design, this is a hands-on sandbox for building trading logic from the ground up.
 
