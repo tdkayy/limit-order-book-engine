@@ -1,65 +1,19 @@
-# 🧮 Limit Order Book Engine
+# High-Performance Limit Order Book (Rust)
 
-A performance-focused trading engine built in Rust with a real-time React dashboard. It mirrors the core mechanics of modern exchanges using FIFO limit order matching and WebSocket-based data broadcasting.
+![Rust](https://img.shields.io/badge/rust-stable-orange?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+![Performance](https://img.shields.io/badge/throughput-8.8M%20orders%2Fs-green?style=flat-square)
 
----
+A low-latency, single-threaded matching engine written in Rust, capable of processing **8.8 million orders per second** on standard hardware. Designed for high-frequency trading (HFT) simulations, this engine implements strict Price-Time priority with $O(1)$ order cancellations.
 
-## 📋 Table of Contents
+## 🚀 Performance
+Benchmarked on a MacBook Pro (M-Series):
+- **Throughput:** ~8,830,000 orders/second
+- **Latency:** Sub-microsecond execution time per order
+- **Load:** Sustained stress test of 1,000,000 continuous order cycles (2M operations)
 
-- 🤖 [Introduction](#-introduction)  
-- ⚙️ [Tech Stack](#-tech-stack)  
-- 🔋 [Features](#-features)  
-- 🤸 [Quick Start](#-quick-start)  
-- 🕸️ [Snippets](#-snippets)   (coming soon)
-- 🔗 [Links](#-links)  (coming soon)
-- 🚀 [More](#-more)   (coming soon)
-- 🚨 [Tutorial](#-tutorial)  (coming soon)
-
----
-
-## 🤖 Introduction
-
-This project simulates a working limit order book, the foundation of modern trading platforms. It handles buy/sell order placement, cancellation, matching, and live trade display. The frontend syncs with the engine in real time using WebSockets and reflects all activity in a fully interactive UI.
-
-Whether you're exploring Rust performance, real-time state management, or order book design, this is a hands-on sandbox for building trading logic from the ground up.
-
----
-
-## ⚙️ Tech Stack
-
-- 🦀 **Rust** – backend engine with Axum + Tokio
-- 🧠 **React** – frontend dashboard (with TypeScript)
-- 📡 **WebSockets** – real-time bidirectional updates
-- ⚛️ **Recoil** – client state management
-- 💨 **Tailwind CSS** – UI styling
-- 📈 **Criterion** – benchmarking
-- 🔥 **Flamegraph** – performance profiling
-- 🧱 **(Planned)** Redis – persistence layer
-
----
-
-## 🔋 Features
-
-👉 FIFO-based limit order matching engine  
-👉 Real-time trade feed via WebSockets  
-👉 Order book synced across all clients  
-👉 User-specific "My Orders" view with cancel actions  
-👉 Stateless engine with clear separation of concerns  
-👉 Performance profiling with Flamegraph (optional)  
-👉 Modular frontend UI with Recoil-based sync
-
----
-
-## 🤸 Quick Start
-
-### 📦 Prerequisites
-
-- Rust (v1.70+ recommended)
-- Node.js + npm
-- (Optional) Flamegraph: `cargo install flamegraph`
-
-### 🧱 Installation
-
-```bash
-git clone https://github.com/tdkayy/limit-order-book
-cd limit-order-book
+```text
+🚀 Starting stress test with 1000000 orders...
+✅ Matched 1000000 pairs of orders
+⏱️ Time taken: 226.49ms
+⚡ Throughput: 8830069 orders/second
