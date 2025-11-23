@@ -18,3 +18,14 @@ Benchmarked on a MacBook Pro (M-Series):
 ⏱️ Time taken: 226.49ms
 ⚡ Throughput: 8830069 orders/second
 
+graph TD
+    A[API / WebSocket] -->|JSON| B(Order Gateway)
+    B -->|Struct| C{Matching Engine}
+    C -->|Limit Order| D[BTreeMap: Price Levels]
+    C -->|Cancel| E[HashMap: Order Index]
+    D -->|Match Found| F[Trade Execution]
+    D -->|No Match| G[Add to Book]
+    F -->|Event| H[Broadcast to Clients]
+
+
+
