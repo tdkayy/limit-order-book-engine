@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import useMyOrders from "../hooks/useMyOrders";
 
-
 const OrderForm = () => {
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -9,40 +8,40 @@ const OrderForm = () => {
   const [message, setMessage] = useState("");
   const { addOrder } = useMyOrders();
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     const order = {
       price: parseFloat(price),
       quantity: parseInt(quantity),
       side: side as "buy" | "sell",
     };
-  
+
     try {
       const res = await fetch("http://localhost:4000/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(order),
       });
-  
+
       const data = await res.json();
-      setMessage(data.message || "Unknown error");
-      
-      if (!res.ok) {
+      setMessage(data.message || "Unknown response");
+
+      if (!res.ok || !data.success || !data.order_id) {
         console.error("❌ Order rejected by backend:", data);
+        return;
       }
-        
-      // ✅ Immediately show in MyOrders
-      if (data.success) {
-        addOrder({
-          ...order,
-          id: data.order_id,
-          side: side as "buy" | "sell",
-          timestamp: new Date().toISOString(),
-        });
-      }
-  
+
+      // ✅ Add to MyOrders & ID store
+      const newOrder = {
+        ...order,
+        id: data.order_id,
+        timestamp: new Date().toISOString(),
+      };
+
+      addOrder(newOrder);
+
+      // ✅ Reset form
       setPrice("");
       setQuantity("");
     } catch (err) {
@@ -50,7 +49,7 @@ const OrderForm = () => {
       setMessage("Failed to submit order.");
     }
   };
-  
+
   return (
     <form
       onSubmit={handleSubmit}

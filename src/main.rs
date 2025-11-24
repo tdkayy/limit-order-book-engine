@@ -1,20 +1,25 @@
 use axum::{
-    extract::{Extension, Json, ws::{WebSocketUpgrade, WebSocket, Message}},
-    routing::{get, post},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Extension, Json,
+    },
     response::IntoResponse,
+    routing::{get, post},
     Router,
 };
-use axum_macros::debug_handler;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::{broadcast, Mutex};
 use tower_http::cors::CorsLayer;
-use tracing::{info, error};
+use tracing::{error, info};
+
+// Import directly from our crate modules
 use limit_order_book_engine::order::{Order, OrderSide};
 use limit_order_book_engine::order_book::OrderBook;
 
+// Use a Mutex for thread safety across the web server
 type SharedOrderBook = Arc<Mutex<OrderBook>>;
 type TradeTx = broadcast::Sender<String>;
 
@@ -25,18 +30,38 @@ struct NewOrder {
     side: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize)]
+pub struct CancelRequest {
+    pub order_id: u64,
+}
+
+#[derive(Serialize)]
 struct OrderResponse {
     success: bool,
     message: String,
     order_id: Option<u64>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CancelResponse {
+    pub status: String,
+    pub order_id: u64,
+}
+
+#[derive(Serialize)]
+struct OrderBookResponse {
+    bids: Vec<Order>,
+    asks: Vec<Order>,
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    // Initialize the engine
     let order_book = Arc::new(Mutex::new(OrderBook::new()));
+    
+    // Channel for broadcasting trades to frontend
     let (tx, _rx) = broadcast::channel::<String>(100);
 
     let app = Router::new()
@@ -45,7 +70,6 @@ async fn main() {
         .route("/api/orders/cancel", post(cancel_order))
         .route("/api/orders/all", get(get_all_orders))
         .route("/api/orderbook", get(get_orderbook))
-        .route("/api/orders/full", get(get_full_orderbook))
         .route("/ws/trades", get(ws_trades))
         .route("/ws/orderbook", get(orderbook_ws_handler))
         .layer(CorsLayer::permissive())
@@ -55,16 +79,14 @@ async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 4000));
     info!("🚀 Server running at {}", addr);
 
-    axum::serve(tokio::net::TcpListener::bind(addr).await.unwrap(), app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> &'static str {
     "API is live!"
 }
 
-#[debug_handler]
 async fn place_order(
     Extension(book): Extension<SharedOrderBook>,
     Extension(tx): Extension<TradeTx>,
@@ -96,9 +118,10 @@ async fn place_order(
     let mut book = book.lock().await;
     book.add_order(order.clone());
 
+    // Broadcast update
     let _ = tx.send(serde_json::json!({
-        "type": "trade",
-        "payload": {
+        "type": "order_book_update",
+        "order": {
             "id": order.id,
             "side": payload.side.to_lowercase(),
             "price": order.price,
@@ -114,53 +137,53 @@ async fn place_order(
     })
 }
 
-async fn cancel_order(Json(payload): Json<CancelRequest>) -> Json<CancelResponse> {
-    Json(CancelResponse {
-        success: true,
-        message: format!("Order {} canceled", payload.order_id),
-    })
-}
+pub async fn cancel_order(
+    Extension(book): Extension<SharedOrderBook>, // FIXED: Changed State to Extension
+    Extension(tx): Extension<TradeTx>,
+    Json(cancel_request): Json<CancelRequest>,
+) -> impl IntoResponse {
+    let order_id = cancel_request.order_id;
+    tracing::info!("📤 Cancel order request: {:?}", cancel_request);
 
-#[derive(Deserialize)]
-struct CancelRequest {
-    order_id: u64,
-}
+    let mut book = book.lock().await;
+    
+    // FIXED: Use the O(1) cancel method we wrote in order_book.rs
+    let removed_order = book.cancel_order(order_id);
 
-#[derive(Serialize)]
-struct CancelResponse {
-    success: bool,
-    message: String,
+    if removed_order.is_some() {
+        // Broadcast cancellation
+        let msg = serde_json::json!({
+            "type": "order_cancelled",
+            "order_id": order_id,
+        });
+        let _ = tx.send(msg.to_string());
+
+        Json(CancelResponse {
+            status: "ok".to_string(),
+            order_id,
+        })
+    } else {
+        Json(CancelResponse {
+            status: "not_found".to_string(),
+            order_id,
+        })
+    }
 }
 
 async fn get_orderbook(Extension(book): Extension<SharedOrderBook>) -> Json<OrderBookResponse> {
     let book = book.lock().await;
-    let bids = book.bids.values().flat_map(|v| v.clone()).collect();
-    let asks = book.asks.values().flat_map(|v| v.clone()).collect();
+    // Flatten the price levels for the JSON response
+    let bids = book.bids.values().flat_map(|level| level.iter().cloned()).collect();
+    let asks = book.asks.values().flat_map(|level| level.iter().cloned()).collect();
     Json(OrderBookResponse { bids, asks })
-}
-
-async fn get_full_orderbook(Extension(book): Extension<SharedOrderBook>) -> Json<OrderBookResponse> {
-    let book = book.lock().await;
-    let bids = book.bids.values().flat_map(|v| v.clone()).collect();
-    let asks = book.asks.values().flat_map(|v| v.clone()).collect();
-    Json(OrderBookResponse { bids, asks })
-}
-
-#[derive(Serialize)]
-struct OrderBookResponse {
-    bids: Vec<Order>,
-    asks: Vec<Order>,
 }
 
 async fn get_all_orders(Extension(book): Extension<SharedOrderBook>) -> Json<serde_json::Value> {
     let book = book.lock().await;
-
-    let bids: Vec<_> = book.bids.values().flat_map(|v| v.clone()).collect();
-    let asks: Vec<_> = book.asks.values().flat_map(|v| v.clone()).collect();
-
-    let all_orders = [bids, asks].concat();
-
-    Json(serde_json::json!({ "orders": all_orders }))
+    let bids: Vec<_> = book.bids.values().flat_map(|level| level.iter().cloned()).collect();
+    let asks: Vec<_> = book.asks.values().flat_map(|level| level.iter().cloned()).collect();
+    let all_orders = [bids, asks].concat(); 
+    Json(serde_json::json!({ "orders": all_orders })) 
 }
 
 async fn ws_trades(ws: WebSocketUpgrade, Extension(tx): Extension<TradeTx>) -> impl IntoResponse {
@@ -181,8 +204,8 @@ async fn orderbook_ws_handler(ws: WebSocketUpgrade, Extension(book): Extension<S
 
 async fn handle_orderbook_socket(mut socket: WebSocket, book: SharedOrderBook) {
     use tokio::time::{interval, Duration};
+    let mut ticker = interval(Duration::from_millis(500)); // Faster updates (500ms)
 
-    let mut ticker = interval(Duration::from_millis(1000));
     loop {
         ticker.tick().await;
 
@@ -191,8 +214,8 @@ async fn handle_orderbook_socket(mut socket: WebSocket, book: SharedOrderBook) {
             serde_json::json!({
                 "type": "orderbook",
                 "payload": {
-                    "bids": book.bids.values().flat_map(|v| v.clone()).collect::<Vec<_>>(),
-                    "asks": book.asks.values().flat_map(|v| v.clone()).collect::<Vec<_>>()
+                    "bids": book.bids.values().flat_map(|level| level.iter().cloned()).collect::<Vec<_>>(),
+                    "asks": book.asks.values().flat_map(|level| level.iter().cloned()).collect::<Vec<_>>()
                 }
             })
         };

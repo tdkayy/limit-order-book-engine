@@ -1,37 +1,75 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useRecoilState } from "recoil";
+import { orderBookState, myOrdersState, tradeFeedState } from "@/state/atoms";
+import { Order, Trade, WebSocketMessage } from "@/types";
 
-export interface Order {
-  id: number;
-  price: number;
-  quantity: number;
-  side: "Buy" | "Sell";
-  timestamp: string;
-}
-
-export interface OrderBookSnapshot {
-  bids: Order[];
-  asks: Order[];
-}
-
-export const useOrderBookSocket = (url: string = "ws://localhost:4000/ws") => {
-  const [orderBook, setOrderBook] = useState<OrderBookSnapshot>({ bids: [], asks: [] });
+export default function useOrderBookSocket(userId: string) {
+  const [orderBook, setOrderBook] = useRecoilState(orderBookState);
+  const [myOrders, setMyOrders] = useRecoilState(myOrdersState);
+  const [tradeFeed, setTradeFeed] = useRecoilState(tradeFeedState);
+  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket(url);
+    ws.current = new WebSocket("ws://localhost:4000/ws");
+    ws.current.onopen = () => console.log("📡 WebSocket connected");
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data) as OrderBookSnapshot;
-      setOrderBook(data);
+    ws.current.onmessage = (event) => {
+      const msg: WebSocketMessage = JSON.parse(event.data);
+
+      switch (msg.type) {
+        case "new_order": {
+          const order: Order = msg.data;
+          setOrderBook((prev): typeof orderBook => {
+            const updated = { ...prev };
+            updated[order.side === "buy" ? "bids" : "asks"] = [
+              ...prev[order.side === "buy" ? "bids" : "asks"],
+              order,
+            ];
+            return updated;
+          });
+
+          if (order.user_id === userId) {
+            setMyOrders((prev: Order[]) => [...prev, order]);
+          }
+          break;
+        }
+
+        case "cancel_order": {
+          const cancelledId: number = msg.data.order_id;
+          const cancelledSide: "buy" | "sell" = msg.data.side;
+
+          setOrderBook((prev): typeof orderBook => ({
+            ...prev,
+            [cancelledSide === "buy" ? "bids" : "asks"]: prev[
+              cancelledSide === "buy" ? "bids" : "asks"
+            ].filter((order: Order) => order.id !== cancelledId),
+          }));
+
+          setMyOrders((prev: Order[]) =>
+            prev.filter((order: Order) => order.id !== cancelledId)
+          );
+
+          setTradeFeed((prev: Trade[]) =>
+            prev.filter((trade: Trade) => trade.order_id !== cancelledId)
+          );
+          break;
+        }
+
+        case "new_trade": {
+          const trade: Trade = msg.data;
+          setTradeFeed((prev: Trade[]) => [trade, ...prev.slice(0, 49)]);
+          break;
+        }
+
+        default:
+          console.warn("⚠️ Unhandled message type:", msg.type);
+      }
     };
 
-    socket.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
+    ws.current.onclose = () => console.log("🔌 WebSocket disconnected");
 
     return () => {
-      socket.close();
+      ws.current?.close();
     };
-  }, [url]);
-
-  return orderBook;
-};
+  }, [setOrderBook, setMyOrders, setTradeFeed, userId]);
+}

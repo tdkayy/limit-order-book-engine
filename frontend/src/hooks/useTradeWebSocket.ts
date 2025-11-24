@@ -21,14 +21,21 @@ export function useTradeWebSocket() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "trade") {
-          setTrades((prev) => [data.payload, ...prev.slice(0, 19)]); // keep max 20 trades
 
-          // 🔊 Play sound
+        if (data.type === "trade") {
+          setTrades((prev) => [data.payload, ...prev.slice(0, 19)]);
+
+          // 🔊 Play trade sound
           audioRef.current?.play().catch((err) => {
             console.warn("Trade sound could not play:", err);
           });
         }
+
+        if (data.type === "cancel" && data.payload?.id) {
+          // 🧹 Remove from feed if cancelled
+          setTrades((prev) => prev.filter((t) => t.id !== data.payload.id));
+        }
+
       } catch (err) {
         console.error("Invalid WebSocket message:", err);
       }

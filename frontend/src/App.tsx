@@ -2,13 +2,14 @@ import React from "react";
 import Header from "./components/Header";
 import OrderForm from "./components/OrderForm";
 import TradeFeed from "./components/TradeFeed";
-import { useOrderBookSocket } from "./hooks/useOrderBookSocket";
+import useOrderBookSocket from "./hooks/useOrderBookSocket";
 import OrderBook from "./components/OrderBook";
 import MyOrders from "./components/MyOrders";
 import "./styles/globals.css";
-
+console.log("✅ App is rendering...");
 const App = () => {
-  const orderBook = useOrderBookSocket(); // Live WebSocket hook
+  const userId = "demo-user-123"; // replace later with real user logic
+  useOrderBookSocket(userId);
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800">
@@ -20,13 +21,13 @@ const App = () => {
         </section>
 
         <section className="col-span-1">
-          <OrderBook bids={orderBook.bids} asks={orderBook.asks} />
+          <OrderBook />
         </section>
 
         <section className="col-span-2">
           <TradeFeed />
         </section>
-        
+
         <section className="col-span-2">
           <MyOrders />
         </section>
@@ -34,5 +35,6 @@ const App = () => {
     </div>
   );
 };
+
 
 export default App;
