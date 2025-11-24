@@ -77,7 +77,7 @@ async fn main() {
         .layer(Extension(tx));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 4000));
-    info!("🚀 Server running at {}", addr);
+    info!("Server running at {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -92,13 +92,13 @@ async fn place_order(
     Extension(tx): Extension<TradeTx>,
     Json(payload): Json<NewOrder>,
 ) -> Json<OrderResponse> {
-    info!("📥 New order payload: {:?}", payload);
+    info!("New order payload: {:?}", payload);
 
     let side = match payload.side.to_lowercase().as_str() {
         "buy" => OrderSide::Buy,
         "sell" => OrderSide::Sell,
         _ => {
-            error!("❌ Invalid side: {}", payload.side);
+            error!("Invalid side: {}", payload.side);
             return Json(OrderResponse {
                 success: false,
                 message: "Invalid order side".into(),
@@ -143,7 +143,7 @@ pub async fn cancel_order(
     Json(cancel_request): Json<CancelRequest>,
 ) -> impl IntoResponse {
     let order_id = cancel_request.order_id;
-    tracing::info!("📤 Cancel order request: {:?}", cancel_request);
+    tracing::info!("Cancel order request: {:?}", cancel_request);
 
     let mut book = book.lock().await;
     
