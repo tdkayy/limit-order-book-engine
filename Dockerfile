@@ -1,11 +1,9 @@
 # Stage 1: Build the application
-# We use the official Rust image to compile the code
 FROM rust:latest AS builder
 
 WORKDIR /usr/src/app
 COPY . .
 
-# --- THE FIX: Install compilation dependencies ---
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
 # Build the release binary
@@ -14,7 +12,7 @@ RUN cargo build --release
 # Stage 2: Create the runtime image
 FROM debian:bookworm-slim
 
-# Install OpenSSL (needed for the app to RUN, not just compile)
+# Install OpenSSL
 RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from the builder stage
