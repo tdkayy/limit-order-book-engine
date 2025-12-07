@@ -46,7 +46,7 @@ Standard LOB implementations often suffer from O(N) cancellation times. Ion util
 graph TD
     A[Inbound Event Stream] -->|Ring Buffer| B(Sequencer)
     B -->|Single Thread| C{Matching Logic}
-    C -->|O(1) Lookup| D[Order Index]
+    C -->|"O(1) Lookup"| D[Order Index]
     C -->|Sequential Access| E[BTreeMap Levels]
     E -->|Fill| F[Output Ring Buffer]
     
