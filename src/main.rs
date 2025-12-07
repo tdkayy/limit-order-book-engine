@@ -8,7 +8,7 @@ use axum::{
     Router,
 };
 use chrono::Utc;
-use futures::{SinkExt, StreamExt};
+//use futures::{SinkExt, StreamExt}; for async tasks
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::{broadcast, Mutex};
@@ -147,7 +147,6 @@ pub async fn cancel_order(
 
     let mut book = book.lock().await;
     
-    // FIXED: Use the O(1) cancel method we wrote in order_book.rs
     let removed_order = book.cancel_order(order_id);
 
     if removed_order.is_some() {
