@@ -1,13 +1,13 @@
-# Ion: Ultra-Low Latency Limit Order Book (Rust)
+# Avantix: Low Latency Limit Order Book 
 
 ![Build Status](https://img.shields.io/github/actions/workflow/status/tdkayy/ion/ci.yml?branch=main&label=build&style=flat-square)
 ![Coverage](https://img.shields.io/codecov/c/github/tdkayy/ion?style=flat-square&token=token)
 ![Latency](https://img.shields.io/badge/p99_latency-<12µs-success?style=flat-square)
 ![Throughput](https://img.shields.io/badge/throughput-8.8M_ops%2Fs-blue?style=flat-square)
 
-**Ion** is a single-threaded, deterministic matching engine engineered in Rust. It is designed to demonstrate **zero-allocation order matching** and **cache-friendly memory layouts** for high-frequency trading simulations.
+**Avantix** is a single-threaded, deterministic matching engine engineered in Rust. It is designed to demonstrate **zero-allocation order matching** and **cache-friendly memory layouts** for high-frequency trading simulations.
 
-Achieves **8.8 million transactions per second (TPS)** on commodity hardware (Apple M-Series) by leveraging a hybrid `BTreeMap` + `VecDeque` architecture to minimize L1/L2 cache misses during order book traversals.
+Achieves **5.9 million transactions per second (TPS)** on commodity hardware (Apple M-Series) by leveraging a hybrid `BTreeMap` + `VecDeque` architecture to minimize L1/L2 cache misses during order book traversals.
 
 ---
 
@@ -17,8 +17,8 @@ Benchmarks executed via `criterion.rs` on a single core (Apple M2 Pro).
 
 | Metric | Measurement | Notes |
 | :--- | :--- | :--- |
-| **Throughput** | **8,830,000 orders/s** | Sustained load (1M sequential orders) |
-| **Mean Latency** | **113 ns** | Time to match and fill |
+| **Throughput** | **5,892,779 orders/s** | Sustained load (1M sequential orders) |
+| **Mean Latency** | **169.69 nanoseconds** | Time to match and fill |
 | **P99 Latency** | **< 12 µs** | Tail latency under max load |
 | **Allocations** | **0** | On the "hot path" (Match/Cancel) |
 
@@ -78,14 +78,17 @@ docker run --rm ion-engine
 ```
 
 ## Project Structure
-src/engine: Core matching logic (the "Hot Path").
-src/orderbook: Data structures for Bids/Asks management.
+src/main: Core matching logic (the "Hot Path").
+
+src/order_book: Data structures for Bids/Asks management.
+
 benches/: Criterion benchmarks for latency/throughput profiling.
-tests/: Property-based tests (Proptest) to fuzz match-integrity.
+
+fuzz/: Property-based tests (Proptest) to fuzz match-integrity.
 
 ## Usage
 1. Run the Engine (API Server)
-Starts the WebSocket and REST API server.
+Starts the WebSocket and REST API server. (frontend coming soon)
 ```text
 cargo run --release
 ```
@@ -103,6 +106,8 @@ cargo test
 ```
 
 ## Roadmap
-IPC Ring Buffer: Implement a shared-memory SPSC queue (e.g., via iceoryx-rs) for sub-microsecond IPC.
+IPC Ring Buffer: Implement a shared-memory SPSC queue (via the likes of iceoryx-rs) for sub-microsecond IPC.
+
 Snapshotting: Binary encoding of book state for rapid crash recovery.
+
 TCP Kernel Bypass: Integration with io_uring for network optimization.
