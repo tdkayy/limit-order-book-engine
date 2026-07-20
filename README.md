@@ -1,63 +1,43 @@
-# Ion: Ultra-Low Latency Limit Order Book (Rust)
+# Avantix
 
-![Build Status](https://img.shields.io/github/actions/workflow/status/tdkayy/ion/ci.yml?branch=main&label=build&style=flat-square)
-![Coverage](https://img.shields.io/codecov/c/github/tdkayy/ion?style=flat-square&token=token)
-![Latency](https://img.shields.io/badge/p99_latency-<12µs-success?style=flat-square)
-![Throughput](https://img.shields.io/badge/throughput-8.8M_ops%2Fs-blue?style=flat-square)
+[![Rust CI](https://github.com/tdkayy/limit-order-book-engine/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/tdkayy/limit-order-book-engine/actions/workflows/ci.yml)
+![Status](https://img.shields.io/badge/status-pre--v0.1-orange)
+![Language](https://img.shields.io/badge/language-Rust-black)
 
-**Ion** is a single-threaded, deterministic matching engine engineered in Rust. It is designed to demonstrate **zero-allocation order matching** and **cache-friendly memory layouts** for high-frequency trading simulations.
+**Avantix is a Rust limit-order-book engine and exchange simulator built to explore matching correctness, order-book data structures, asynchronous APIs, testing, and performance measurement.**
 
-Achieves **8.8 million transactions per second (TPS)** on commodity hardware (Apple M-Series) by leveraging a hybrid `BTreeMap` + `VecDeque` architecture to minimize L1/L2 cache misses during order book traversals.
+> **Status:** pre-v0.1 correctness hardening. Avantix is an engineering project, not a production exchange or a claim of production trading-system performance.
 
----
+## Purpose
 
-## Performance Benchmarks
+Matching engines sit at the intersection of algorithms, systems design, financial-market rules, and performance engineering. Avantix provides a focused environment for studying:
 
-Benchmarks executed via `criterion.rs` on a single core (Apple M2 Pro).
+- price and time priority;
+- full and partial fills;
+- cancellation and active-order indexing;
+- deterministic state transitions;
+- REST and WebSocket integration;
+- correctness testing, fuzzing, profiling, and benchmarking;
+- the trade-offs between simple and specialised data structures.
 
-| Metric | Measurement | Notes |
-| :--- | :--- | :--- |
-| **Throughput** | **8,830,000 orders/s** | Sustained load (1M sequential orders) |
-| **Mean Latency** | **113 ns** | Time to match and fill |
-| **P99 Latency** | **< 12 µs** | Tail latency under max load |
-| **Allocations** | **0** | On the "hot path" (Match/Cancel) |
+The first release prioritises **correctness, reproducibility, and defensible design decisions** over headline throughput figures or premature distributed architecture.
 
-> **Note on Concurrency:** This engine intentionally uses a **single-threaded event loop** pattern (similar to LMAX Disruptor) to avoid context-switching overhead and lock contention. State is pinned to a single core for maximum cache locality.
+## Current capabilities
 
----
+- In-memory bid and ask books
+- Ordered price levels using `BTreeMap`
+- FIFO queues at each price using `VecDeque`
+- Limit-order insertion, partial fills, cancellation, and best-price retrieval
+- Axum REST API and WebSocket streams
+- Tokio-based shared application state
+- Unit tests for core matching behaviour
+- Criterion microbenchmarks and a synthetic release-mode benchmark
+- `cargo-fuzz` target
+- Docker packaging
+- GitHub Actions checks for build, tests, and formatting
 
-## System Architecture
+## Architecture
 
-### 1. Hybrid Data Structures (O(1) Cancellation)
-Standard LOB implementations often suffer from O(N) cancellation times. Ion utilizes a dual-structure approach to guarantee constant time complexity for critical operations.
-
-* **Price Levels (`BTreeMap<u64, VecDeque<Order>>`):**
-    * Maintains sorted order of bids/asks.
-    * `VecDeque` allows for O(1) appending and popping at the best price level, respecting strict Price-Time priority.
-* **Order Index (`HashMap<OrderID, OrderPointer>`):**
-    * Maps every active `OrderID` to its specific Price Level.
-    * Allows **O(1) Cancellation** without scanning the book.
-
-### 2. Memory Optimization (Zero-Copy)
-* **Arena Allocation:** Orders are effectively "pooled" to prevent memory fragmentation.
-* **Zero-Copy Parsing:** Incoming byte streams (simulated FIX/Binary) are parsed without intermediate allocations using `nom` (or custom zero-copy deserializers).
-
-```mermaid
-graph TD
-    A[Inbound Event Stream] -->|Ring Buffer| B(Sequencer)
-    B -->|Single Thread| C{Matching Logic}
-    C -->|"O(1) Lookup"| D[Order Index]
-    C -->|Sequential Access| E[BTreeMap Levels]
-    E -->|Fill| F[Output Ring Buffer]
-    
-    subgraph "Hot Path (No Alloc)"
-    C
-    D
-    E
-    end
-```
-## Usage
-Build & Test
 ```text
 HTTP / WebSocket clients
           |
@@ -67,55 +47,83 @@ HTTP / WebSocket clients
           v
  Arc<Mutex<OrderBook>>
           |
-          +----> BTreeMap bid levels
-          +----> BTreeMap ask levels
-          +----> order-location index
+          +----> BTreeMap<u64, VecDeque<Order>> bids
+          +----> BTreeMap<u64, VecDeque<Order>> asks
+          +----> HashMap<OrderId, Price> location index
+          |
+          +----> broadcast channel for API events
 ```
 
-This shared-state server design is deliberately simple while the matching rules are stabilised. A future iteration will move the engine behind a single-owner command-processing task so order sequencing and backpressure can be reasoned about more explicitly.
+This shared-state design is deliberately simple while the matching contract is stabilised. A later iteration will place the engine behind a single-owner command-processing task so sequencing, backpressure, and event publication can be handled explicitly.
 
-## Data-structure choices
+## v0.1 correctness contract
 
-### Ordered price levels
-
-`BTreeMap` keeps price levels ordered and supports direct retrieval of the best ask and best bid. It is easier to inspect and reason about than a more specialised structure while the project is focused on correctness.
-
-### FIFO within a price level
-
-Each price level uses a `VecDeque<Order>`. New resting orders are appended to the back, and matching consumes orders from the front.
-
-### Cancellation index
-
-A `HashMap` maps an order ID to its price. This avoids scanning every price level, but cancellation still performs a linear search within the identified level. **Avantix does not currently claim constant-time cancellation.**
-
-## Correctness model
-
-The intended matching rules for v0.1 are:
+Avantix v0.1 will guarantee that:
 
 1. A buy order matches the lowest eligible ask first.
 2. A sell order matches the highest eligible bid first.
-3. Orders at the same price execute FIFO.
-4. A trade uses the resting order's price.
-5. Partial resting orders retain their queue position.
-6. Any unfilled limit-order quantity rests on the book.
+3. Resting orders at the same price execute FIFO.
+4. Trades execute at the resting order's price.
+5. Partially filled resting orders retain queue position.
+6. Unfilled limit-order quantity rests on the book.
 7. Empty price levels are removed.
-8. Cancelled or fully filled orders are removed from the active-order index.
-9. Processing an accepted command must not leave a crossed book.
+8. Cancelled and fully filled orders leave the active-order index.
+9. Accepted commands do not leave the book crossed.
+10. Invalid and duplicate orders are rejected explicitly.
 
-Each rule will be represented by focused tests before v0.1 is tagged.
+Each rule will be represented by focused tests before `v0.1.0` is tagged.
 
-## Current pre-v0.1 limitations
+## Data-structure choices
 
-The following items are known and are part of the v0.1 work rather than hidden behind performance claims:
+### Price levels
 
-- sell-side best-price traversal requires correction and mirrored tests;
-- the order-submission API currently inserts an order directly instead of routing it through matching execution;
-- the WebSocket event route does not yet publish a dedicated structured `Trade` event;
-- cancellation is linear within one price level;
-- the current fuzz target exercises a single generated insertion rather than command sequences and invariants;
-- the benchmark suite does not represent network, JSON, persistence, or production exchange throughput.
+Bids and asks use separate `BTreeMap<u64, VecDeque<Order>>` structures. `BTreeMap` keeps price levels ordered and makes best-price retrieval straightforward. It is being used as a readable correctness-first baseline rather than presented as the fastest possible structure.
 
-## Running the project
+### Time priority
+
+Each price level uses a `VecDeque<Order>`. New resting orders are appended to the back, while matching consumes orders from the front.
+
+### Cancellation
+
+A `HashMap<OrderId, Price>` identifies the price level containing an active order. The current implementation then scans within that level, so cancellation is approximately:
+
+```text
+O(log P + L)
+```
+
+where `P` is the number of price levels and `L` is the number of orders at the identified level. Avantix does **not** currently claim constant-time cancellation.
+
+## API
+
+The server listens on `127.0.0.1:4000`.
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/` | Health check |
+| `POST` | `/api/orders` | Submit an order |
+| `POST` | `/api/orders/cancel` | Cancel an active order |
+| `GET` | `/api/orders/all` | Return all resting orders |
+| `GET` | `/api/orderbook` | Return the current book |
+| `GET` | `/ws/orderbook` | Stream periodic book snapshots |
+| `GET` | `/ws/trades` | Stream API events; dedicated trade events are planned for v0.1 |
+
+### Submit an order
+
+```bash
+curl -X POST http://127.0.0.1:4000/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"side":"buy","price":101,"quantity":10}'
+```
+
+### Cancel an order
+
+```bash
+curl -X POST http://127.0.0.1:4000/api/orders/cancel \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":123456789}'
+```
+
+## Run locally
 
 ### Requirements
 
@@ -130,46 +138,89 @@ cargo test
 cargo fmt -- --check
 ```
 
-### Start the API server
+### Start the API
 
 ```bash
 cargo run --release
 ```
-## Docker Support
-The engine is containerized for reproducible latency testing.
 
-Bash
-```text
-docker build -t ion-engine .
-docker run --rm ion-engine
-```
+### Run benchmarks
 
-## Project Structure
-src/engine: Core matching logic (the "Hot Path").
-src/orderbook: Data structures for Bids/Asks management.
-benches/: Criterion benchmarks for latency/throughput profiling.
-tests/: Property-based tests (Proptest) to fuzz match-integrity.
-
-## Usage
-1. Run the Engine (API Server)
-Starts the WebSocket and REST API server.
-```text
-cargo run --release
-```
-
-2. Run the Benchmark
-Executes the stress test script to verify throughput.
-```text
+```bash
+cargo bench
 cargo run --release --bin manual_benchmark
 ```
 
-3. Run Unit Tests
-Verifies matching logic, partial fills, and price-time priority.
-```text
-cargo test
+### Docker
+
+```bash
+docker build -t avantix .
+docker run --rm -p 4000:4000 avantix
 ```
 
+> The server currently binds to `127.0.0.1`; container networking will be corrected before Docker-based API access is treated as a supported v0.1 workflow.
+
+## Benchmarking policy
+
+The current Criterion benchmark measures batched same-price order insertion. The manual benchmark measures a synthetic loop that repeatedly adds a resting sell and executes a crossing buy.
+
+These are development workloads, not production exchange benchmarks. They exclude network transport, JSON processing, persistence, realistic distributions, multiple instruments, backpressure, and end-to-end tail latency.
+
+Avantix will not publish headline throughput, p99 latency, zero-allocation, or production-scale claims until the relevant methodology measures those properties directly and can be reproduced.
+
+## Work required for v0.1
+
+- [ ] Correct and test sell-side best-price traversal
+- [ ] Route API submissions through matching execution
+- [ ] Introduce a structured `Trade` event
+- [ ] Separate book updates from execution events
+- [ ] Add full-fill, partial-fill, multi-level, FIFO, cancellation, and invalid-input tests
+- [ ] Reject duplicate order IDs
+- [ ] Replace the single-insertion fuzz target with command sequences and invariants
+- [ ] Split benchmarks into insertion, matching, cancellation, and mixed workloads
+- [ ] Add Clippy to CI
+- [ ] Align package, Docker, repository, and public naming around Avantix
+- [ ] Tag `v0.1.0` only after the correctness contract is covered
+
 ## Roadmap
-IPC Ring Buffer: Implement a shared-memory SPSC queue (e.g., via iceoryx-rs) for sub-microsecond IPC.
-Snapshotting: Binary encoding of book state for rapid crash recovery.
-TCP Kernel Bypass: Integration with io_uring for network optimization.
+
+### v0.1 — Correct matching core
+
+Bidirectional price-time priority, structured executions, API integration, validation, comprehensive tests, and reproducible benchmark documentation.
+
+### v0.2 — Determinism and recovery
+
+Sequence numbers, append-only event logging, deterministic replay, snapshots, and recovery tests.
+
+### v0.3 — Stronger verification
+
+Property-based testing, command-sequence fuzzing, explicit invariants, and model-based comparison with a slower reference implementation.
+
+### v0.4 — Measured optimisation
+
+Realistic mixed-workload benchmarks, profiling-guided optimisation, cancellation data-structure experiments, and a single-owner engine task with bounded queues.
+
+## Project structure
+
+```text
+.
+├── .github/workflows/ci.yml
+├── benches/order_book_benchmark.rs
+├── fuzz/fuzz_targets/
+├── src/
+│   ├── lib.rs
+│   ├── main.rs
+│   ├── manual_benchmark.rs
+│   ├── order.rs
+│   └── order_book.rs
+├── Cargo.toml
+└── Dockerfile
+```
+
+## Scope
+
+Avantix is not currently a regulated exchange, brokerage platform, distributed matching cluster, FIX gateway, kernel-bypass stack, or zero-allocation lock-free engine. Adding those technologies before the core is correct and measurable would make the project larger, not better.
+
+## Author
+
+Built by [Tolu Adesanya](https://github.com/tdkayy) as a systems-engineering project focused on financial-market infrastructure, correctness, and performance reasoning.
