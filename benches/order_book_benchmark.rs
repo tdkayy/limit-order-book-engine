@@ -1,7 +1,7 @@
+use chrono::Utc;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use limit_order_book_engine::order::{Order, OrderSide};
 use limit_order_book_engine::order_book::OrderBook;
-use chrono::Utc;
 
 fn bench_add_order(c: &mut Criterion) {
     let timestamp = Utc::now().naive_utc();
@@ -10,7 +10,7 @@ fn bench_add_order(c: &mut Criterion) {
         b.iter(|| {
             // Measure "end-to-end" processing
             let mut ob = OrderBook::new();
-            
+
             // Batch of 10,000 orders
             for i in 0..10_000 {
                 let order = Order {

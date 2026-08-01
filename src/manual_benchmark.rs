@@ -37,8 +37,11 @@ fn main() {
 
     println!("Matched {} pairs of orders", n);
     println!("Time taken: {:?}", duration);
-    println!("Throughput: {:.0} orders/second", (n as f64 * 2.0) / duration.as_secs_f64());
-    
+    println!(
+        "Throughput: {:.0} orders/second",
+        (n as f64 * 2.0) / duration.as_secs_f64()
+    );
+
     // Sanity check: The book should be empty if everything matched
     println!("Remaining best ask: {:?}", book.get_best_ask());
     println!("Remaining best bid: {:?}", book.get_best_bid());

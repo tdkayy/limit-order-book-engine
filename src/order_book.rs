@@ -78,34 +78,35 @@ impl OrderBook {
     pub fn execute_order(&mut self, mut incoming: Order) -> Vec<(u64, u32)> {
         let mut fills = Vec::new();
 
-        {
-            let book = match incoming.side {
-                OrderSide::Buy => &mut self.asks,
-                OrderSide::Sell => &mut self.bids,
-            };
+        match incoming.side {
+            OrderSide::Buy => {
+                let mut empty_levels = Vec::new();
 
-            let mut empty_levels = Vec::new();
+                // Buyers take the cheapest asks first.
+                for (&price, level) in self.asks.iter_mut() {
+                    if price > incoming.price {
+                        break;
+                    }
 
-            for (&price, level) in book.iter_mut() {
-                let match_possible = match incoming.side {
-                    OrderSide::Buy => price <= incoming.price,
-                    OrderSide::Sell => price >= incoming.price,
-                };
+                    while let Some(resting) = level.front_mut() {
+                        let traded_qty = incoming.quantity.min(resting.quantity);
 
-                if !match_possible {
-                    break;
-                }
+                        incoming.quantity -= traded_qty;
+                        resting.quantity -= traded_qty;
+                        fills.push((resting.id, traded_qty));
 
-                while let Some(resting) = level.front_mut() {
-                    let traded_qty = incoming.quantity.min(resting.quantity);
+                        if resting.quantity == 0 {
+                            self.order_locations.remove(&resting.id);
+                            level.pop_front();
+                        }
 
-                    incoming.quantity -= traded_qty;
-                    resting.quantity -= traded_qty;
-                    fills.push((resting.id, traded_qty));
+                        if incoming.quantity == 0 {
+                            break;
+                        }
+                    }
 
-                    if resting.quantity == 0 {
-                        self.order_locations.remove(&resting.id);
-                        level.pop_front();
+                    if level.is_empty() {
+                        empty_levels.push(price);
                     }
 
                     if incoming.quantity == 0 {
@@ -113,20 +114,53 @@ impl OrderBook {
                     }
                 }
 
-                if level.is_empty() {
-                    empty_levels.push(price);
-                }
-
-                if incoming.quantity == 0 {
-                    break;
+                for price in empty_levels {
+                    self.asks.remove(&price);
                 }
             }
 
-            for price in empty_levels {
-                book.remove(&price);
+            OrderSide::Sell => {
+                let mut empty_levels = Vec::new();
+
+                // Sellers take the highest bids first.
+                for (&price, level) in self.bids.iter_mut().rev() {
+                    if price < incoming.price {
+                        break;
+                    }
+
+                    while let Some(resting) = level.front_mut() {
+                        let traded_qty = incoming.quantity.min(resting.quantity);
+
+                        incoming.quantity -= traded_qty;
+                        resting.quantity -= traded_qty;
+                        fills.push((resting.id, traded_qty));
+
+                        if resting.quantity == 0 {
+                            self.order_locations.remove(&resting.id);
+                            level.pop_front();
+                        }
+
+                        if incoming.quantity == 0 {
+                            break;
+                        }
+                    }
+
+                    if level.is_empty() {
+                        empty_levels.push(price);
+                    }
+
+                    if incoming.quantity == 0 {
+                        break;
+                    }
+                }
+
+                for price in empty_levels {
+                    self.bids.remove(&price);
+                }
             }
         }
 
+        // Only the unfilled remainder becomes a resting order.
         if incoming.quantity > 0 {
             self.add_order(incoming);
         }
@@ -153,7 +187,7 @@ mod tests {
     #[test]
     fn test_simple_match() {
         let mut book = OrderBook::new();
-        
+
         let sell_order = new_order(OrderSide::Sell, 100, 10);
         book.add_order(sell_order);
 
@@ -169,7 +203,7 @@ mod tests {
     #[test]
     fn test_partial_fill() {
         let mut book = OrderBook::new();
-        
+
         book.add_order(new_order(OrderSide::Sell, 100, 20));
 
         let buy_order = new_order(OrderSide::Buy, 100, 10);
@@ -185,7 +219,7 @@ mod tests {
     #[test]
     fn test_price_priority() {
         let mut book = OrderBook::new();
-        
+
         let sell_cheap = new_order(OrderSide::Sell, 100, 10);
         let id_cheap = sell_cheap.id;
         book.add_order(sell_cheap);
